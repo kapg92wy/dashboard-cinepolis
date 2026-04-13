@@ -124,6 +124,11 @@ tr:last-child td{border-bottom:none;}
     <div class="ccard"><div class="ctitle">Urgentes por Región</div><div class="csub">Solo incidencias urgentes</div><div class="cwrap2"><canvas id="cUrg"></canvas></div></div>
   </div>
 </div>
+<div style="margin-top:20px;">
+  <div style="font-family:var(--ff);font-size:16px;font-weight:600;margin-bottom:4px;">⚡ Top 10 — Reparar Primero</div>
+  <div style="font-size:11px;color:var(--text2);margin-bottom:14px;">Máquinas con incidencia abierta · mayor venta semanal promedio</div>
+  <div id="topCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;"></div>
+</div>
 <div id="tab-incidencias" class="tab">
   <div class="fbar">
     <span class="flabel">Región</span><select id="fReg" onchange="filterInc()"><option value="">Todas</option></select>
@@ -252,6 +257,29 @@ function buildCharts(){
   new Chart(document.getElementById('cClasif'),{type:'doughnut',data:{labels:ck,datasets:[{data:cv,backgroundColor:['rgba(59,130,246,0.8)','rgba(249,115,22,0.8)','rgba(239,68,68,0.8)'],borderColor:'#141c2e',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{color:'#8b95ab',font:{size:10},boxWidth:10,padding:6}},tooltip:{backgroundColor:'#1f2b45',titleColor:'#e8eaf0',bodyColor:'#8b95ab',borderColor:'#2a3550',borderWidth:1}}}});
   const urg=D.by_region.filter(r=>r.urgentes>0).sort((a,b)=>b.urgentes-a.urgentes);
   new Chart(document.getElementById('cUrg'),{type:'bar',data:{labels:urg.map(r=>r.Region),datasets:[{data:urg.map(r=>r.urgentes),backgroundColor:'rgba(239,68,68,0.65)',borderColor:'#ef4444',borderWidth:1,borderRadius:3}]},options:CO});
+  const medals=['🥇','🥈','🥉'];
+  const tcards=document.getElementById('topCards');
+  tcards.innerHTML=D.top_priority.slice(0,10).map((r,i)=>{
+    const icon=i<3?medals[i]:'<span style="font-family:var(--ff);font-size:18px;font-weight:700;color:var(--text2);">#'+(i+1)+'</span>';
+    const d=r.dias_abierta||0;
+    const dc=d>90?'var(--red)':d>60?'var(--orange)':d>30?'var(--gold)':'var(--green)';
+    const v=r.avg_semanal?'$'+Math.round(r.avg_semanal).toLocaleString():'-';
+    const urg=r.Prioridad==='Urgente'?'<span class="badge br" style="font-size:9px;">URGENTE</span>':'';
+    return '<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;">'
+      +'<div style="font-size:24px;min-width:32px;text-align:center;margin-top:2px;">'+icon+'</div>'
+      +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-family:var(--ff);font-size:13px;font-weight:600;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(r.Serie||'')+'</div>'
+        +'<div style="font-size:11px;color:var(--text);margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(r.Conjunto||'')+'</div>'
+        +'<div style="font-size:10px;color:var(--text2);">'+(r.Region||'')+' · '+(r['Nombre de Incidencia']||'')+'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">'
+          +'<span style="font-family:var(--ff);font-size:20px;font-weight:700;color:var(--green);">'+v+'</span>'
+          +'<span style="font-size:10px;color:var(--text3);">prom/sem</span>'
+          +'<span style="font-family:var(--ff);font-size:13px;font-weight:700;color:'+dc+';">'+d+'d</span>'
+          +urg
+        +'</div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
 }
 
 function filterInc(){
@@ -279,27 +307,64 @@ function renderInc(){
 function resetInc(){['fReg','fPrio','fClasif','fTipo','fDias'].forEach(id=>document.getElementById(id).value='');document.getElementById('fSearch').value='';filterInc();}
 
 function filterPrio(){
-  const reg=document.getElementById('fpReg').value,pri=document.getElementById('fpPrio').value,src=document.getElementById('fpSearch').value.toLowerCase();
+  const reg=document.getElementById('fpReg').value;
+  const pri=document.getElementById('fpPrio').value;
+  const src=document.getElementById('fpSearch').value.toLowerCase();
   prioF=D.top_priority.filter(r=>{
-    if(reg&&r.Region!==reg)return false;if(pri&&r.Prioridad!==pri)return false;
-    if(src){const h=[r.Serie,r.Conjunto,r.Region].join(' ').toLowerCase();if(!h.includes(src))return false;}
+    if(reg&&r.Region!==reg)return false;
+    if(pri&&r.Prioridad!==pri)return false;
+    if(src){const h=[String(r.Serie||''),r.Conjunto||'',r.Region||''].join(' ').toLowerCase();if(!h.includes(src))return false;}
     return true;
   });
-  prioPg=1;renderPrio();document.getElementById('prioCount').textContent=prioF.length+' registros';
+  prioPg=1;
+  renderPrio();
+  document.getElementById('prioCount').textContent=prioF.length+' registros';
 }
+
 function renderPrio(){
-  const s=(prioPg-1)*PS,pg=prioF.slice(s,s+PS),tb=document.getElementById('tbPrio');
-  if(!pg.length){tb.innerHTML='<tr><td colspan="10" class="nodata">Sin registros</td></tr>';return;}
+  const s=(prioPg-1)*PS;
+  const pg=prioF.slice(s,s+PS);
+  const tb=document.getElementById('tbPrio');
+  if(!pg.length){tb.innerHTML='<tr><td colspan="10" class="nodata">Sin registros</td></tr>';document.getElementById('pagPrio').innerHTML='';return;}
   tb.innerHTML=pg.map((r,i)=>{
-    const rk=s+i+1,rc=rk===1?'var(--gold)':rk<=3?'var(--orange)':'var(--text2)';
+    const rk=s+i+1;
+    const rc=rk===1?'var(--gold)':rk<=3?'var(--orange)':'var(--text2)';
     const pb=r.Prioridad==='Urgente'?'<span class="badge br">Urgente</span>':'<span class="badge bw">Normal</span>';
-    const d=r.dias_abierta||0,dc=d>90?'var(--red)':d>60?'var(--orange)':d>30?'var(--gold)':'var(--green)';
-    const v=r.avg_semanal?'$'+Math.round(r.avg_semanal).toLocaleString():'-',t=r.TOTAL_VENTA?'$'+Math.round(r.TOTAL_VENTA).toLocaleString():'-';
-    return `<tr><td style="color:${rc};font-family:var(--ff);font-size:17px;font-weight:700;">${rk}</td><td style="color:var(--text2);font-size:11px;">${r.IdIncidencia||''}</td><td style="font-family:var(--ff);color:var(--gold);font-weight:600;">${r.Serie||''}</td><td>${r['Nombre de Incidencia']||''}</td><td>${pb}</td><td>${r.Conjunto||''}</td><td>${r.Region||''}</td><td style="color:${dc};font-family:var(--ff);font-size:16px;font-weight:700;">${d}</td><td style="color:var(--gold);font-family:var(--ff);font-size:17px;font-weight:700;">${v}</td><td style="color:var(--text2);">${t}</td></tr>`;
+    const d=r.dias_abierta||0;
+    const dc=d>90?'var(--red)':d>60?'var(--orange)':d>30?'var(--gold)':'var(--green)';
+    const v=r.avg_semanal?'$'+Math.round(r.avg_semanal).toLocaleString():'-';
+    const t=r.TOTAL_VENTA?'$'+Math.round(r.TOTAL_VENTA).toLocaleString():'-';
+    return '<tr>'
+      +'<td style="color:'+rc+';font-family:var(--ff);font-size:17px;font-weight:700;">'+rk+'</td>'
+      +'<td style="color:var(--text2);font-size:11px;">'+(r.IdIncidencia||'')+'</td>'
+      +'<td style="font-family:var(--ff);color:var(--gold);font-weight:600;">'+(r.Serie||'')+'</td>'
+      +'<td>'+(r['Nombre de Incidencia']||'')+'</td>'
+      +'<td>'+pb+'</td>'
+      +'<td>'+(r.Conjunto||'')+'</td>'
+      +'<td>'+(r.Region||'')+'</td>'
+      +'<td style="color:'+dc+';font-family:var(--ff);font-size:16px;font-weight:700;">'+d+'</td>'
+      +'<td style="color:var(--gold);font-family:var(--ff);font-size:17px;font-weight:700;">'+v+'</td>'
+      +'<td style="color:var(--text2);">'+t+'</td>'
+      +'</tr>';
   }).join('');
-  renderPag('pagPrio',prioF.length,prioPg,p=>{prioPg=p;renderPrio();});
+  // Paginación sin pasar funciones como string
+  const total=prioF.length;
+  const tp=Math.ceil(total/PS);
+  const pag=document.getElementById('pagPrio');
+  if(tp<=1){pag.innerHTML='<span class="pinfo">'+total+' registros</span>';return;}
+  let h='<span class="pinfo">'+total+' registros · Página '+prioPg+' de '+tp+'</span>';
+  if(prioPg>1)h+='<button class="pbtn" onclick="prioPg--;renderPrio()">‹</button>';
+  const st2=Math.max(1,prioPg-2),en2=Math.min(tp,prioPg+2);
+  for(let p=st2;p<=en2;p++)h+='<button class="pbtn'+(p===prioPg?' active':'')+'" onclick="prioPg='+p+';renderPrio()">'+p+'</button>';
+  if(prioPg<tp)h+='<button class="pbtn" onclick="prioPg++;renderPrio()">›</button>';
+  pag.innerHTML=h;
 }
-function resetPrio(){['fpReg','fpPrio'].forEach(id=>document.getElementById(id).value='');document.getElementById('fpSearch').value='';filterPrio();}
+
+function resetPrio(){
+  ['fpReg','fpPrio'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fpSearch').value='';
+  filterPrio();
+}
 
 function renderVenta(){
   const tb=document.getElementById('tbVenta');
